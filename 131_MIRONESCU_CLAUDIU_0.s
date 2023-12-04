@@ -15,11 +15,32 @@ y: .long 0
 
 # matricea va fi de forma M[20][20] = 400 biti = 100 bytes
 
+mainBuffer: .long 1
+
 BUF1: .space 400
 BUF2: .space 400
 
-formatString1: .asciz "%ld %ld %ld"
+formatString3: .asciz "%ld %ld %ld"
 formatString2: .asciz "%ld %ld"
+formatString1: .asciz "%ld"
+
+#variabile pentru functia getCellState
+curent: .long 0
+
+N: .long 0
+S: .long 0
+E: .long 0
+W: .long 0
+
+NE: .long 0
+NW: .long 0
+
+SE: .long 0
+SW: .long 0
+
+SUM_CELLS: .long 0
+
+result: .long 0
 
 .text
 .global main
@@ -33,7 +54,7 @@ input:
 	pushl $n
 	pushl $m
 
-	pushl $formatString1
+	pushl $formatString3
 
 	call scanf
 
@@ -43,8 +64,8 @@ input:
 	popl %ebx
 
 mov p, %ecx
-for_celule:
 
+for_cells:
 # practic forul urmator:
 
 # for (int i = p; i >= 0; --i)
@@ -53,8 +74,9 @@ for_celule:
 
 
 	cmp $0, %ecx
-	je exit
+	je input_iteratii
 
+	pushl %ecx
 	pushl $x
 	pushl $y
 	pushl $formatString2
@@ -64,6 +86,7 @@ for_celule:
 	popl %ebx
 	popl %ebx
 	popl %ebx
+	popl %ecx
 
 	#adauga celula in buffer1
 	add_buffer:
@@ -80,7 +103,69 @@ for_celule:
 		movl $1, (%edi, %eax, 4)
 
 	decl %ecx
-	jmp for_celule
+	jmp for_cells
+
+input_iteratii:
+	pushl $k
+	pushl $formatString1
+
+	call scanf
+
+	popl %ebx
+	popl %ebx
+
+# TODO: functia getCellState() returneaza statusul din generatia viitoare a celulei in functie de vecinii sai
+get_cell_state:
+xor %ebx, %ebx
+
+# TODO: functia emulate care rezolva fiecare pas
+emulate:
+mov $1, y
+
+for_y:
+	mov y, %ecx
+	cmp m, %ecx
+	jg schimba_buffer
+
+	mov $1, x
+	for_x:
+		mov x, %ecx
+		cmp n, %ecx
+		jg skip_y
+
+		get_x_y:
+			movl y, %eax
+			mov $20, %ebx
+			mull %ebx
+
+			add x, %eax
+
+		if:
+			cmp $1, mainBuffer
+			je update_buffer2
+
+			jmp update_buffer1
+
+		update_buffer1:
+			lea BUF2, %edi
+
+			mov $1, (%edi, %eax, 4)
+		update_buffer2:
+			lea BUF1, %edi
+
+			mov $1, (%edi, %eax, 4)
+
+		incl x
+		jmp for_x
+
+	skip_y:
+	incl y
+	jmp for_y
+
+schimba_buffer:
+	# TODO: mainBuffer = !mainBuffer
+
+	ret
 
 exit:
 mov $1, %eax

@@ -1,21 +1,15 @@
 .data
-# n,m < 18 --> n si m pot fi reprezentate pe 5 biti < 2 bytes
 m: .long 0
 n: .long 0
-
-# p < 18 * 18 = 324 --> p poate fi reprezentat pe 9 biti < 3 bytes
 p: .long 0
-
-# k < 15 < 2^4 --> k poate fi reprezentat pe 4 biti = 1 byte
 k: .long 0
 
-# x si y - pozitiile unei celule la un moment dat
 x: .long 0
 y: .long 0
 
-# matricea va fi de forma M[20][20] = 400 biti = 100 bytes
-
 mainBuffer: .long 1
+
+suma: .long 0
 
 BUF1: .space 400
 BUF2: .space 400
@@ -24,32 +18,32 @@ formatString3: .asciz "%ld %ld %ld"
 formatString2: .asciz "%ld %ld"
 formatString1: .asciz "%ld"
 
-#variabile pentru functia getCellState
-curent: .long 0
+afisat0: .asciz "0 "
+afisat1: .asciz "1 "
 
-N: .long 0
-S: .long 0
-E: .long 0
-W: .long 0
-
-NE: .long 0
-NW: .long 0
-
-SE: .long 0
-SW: .long 0
-
-SUM_CELLS: .long 0
-
-result: .long 0
+nl: .ascii "\n"
 
 .text
 .global main
 
 main:
-jmp input
 
+# SET_ZERO - seteaza pseudo matricea buf1 cu zero-uri
+set_zero1:
+	lea BUF1, %edi
+	movl $0, %ecx
+
+	for_zero:
+		cmp $400, %ecx
+		je input
+
+		movl $0, (%edi, %ecx, 4)
+
+		incl %ecx
+		jmp for_zero
+
+# INPUT - citeste numarul de linii, coloane si celule vii
 input:
-# citeste numarul de linii, coloane si celule vii
 	pushl $p
 	pushl $n
 	pushl $m
@@ -63,8 +57,9 @@ input:
 	popl %ebx
 	popl %ebx
 
-mov p, %ecx
+movl p, %ecx
 
+jmp afisari
 for_cells:
 # practic forul urmator:
 
@@ -113,29 +108,60 @@ input_iteratii:
 
 	popl %ebx
 	popl %ebx
+jmp emulate
 
-# TODO: functia getCellState() returneaza statusul din generatia viitoare a celulei in functie de vecinii sai
 get_cell_state:
-xor %ebx, %ebx
+	pushl %ebp
+	mov %esp, %ebp
 
-# TODO: functia emulate care rezolva fiecare pas
+	pushl %ebx
+	pushl %eax
+	pushl %ecx
+
+	#  8(%ebp) = y
+	# 12(%ebp) = x
+	# 16(%ebp) = &BUFF
+
+	lea 16(%ebp), %edi
+
+	movl $0, suma
+	movl 8(%ebp), %eax
+	decl %eax
+
+	movl $20, %ebx
+	mull %ebx
+
+	movl 12(%ebp), %ebx
+	addl %ebx, %eax
+
+	movl (%edi, %eax, 4), %ebx
+	addl %ebx, suma
+
+	popl %ecx
+	popl %eax
+	popl %ebx
+	popl %ebp
+
+	ret
+
+# EMULATE - functia care rezolva cate o iteratie
 emulate:
-mov $1, y
+movl $1, y
 
 for_y:
-	mov y, %ecx
+	movl y, %ecx
 	cmp m, %ecx
 	jg schimba_buffer
 
-	mov $1, x
+	movl $1, x
 	for_x:
-		mov x, %ecx
+		movl x, %ecx
 		cmp n, %ecx
 		jg skip_y
 
 		get_x_y:
 			movl y, %eax
-			mov $20, %ebx
+			movl $20, %ebx
 			mull %ebx
 
 			add x, %eax
@@ -147,13 +173,21 @@ for_y:
 			jmp update_buffer1
 
 		update_buffer1:
-			lea BUF2, %edi
+			pushl $BUF2
+			pushl x
+			pushl y
+			test:
+			call get_cell_state
 
-			mov $1, (%edi, %eax, 4)
+			popl %ebx
+			popl %ebx
+			popl %ebx
+
+			movl $1, (%edi, %eax, 4)
 		update_buffer2:
 			lea BUF1, %edi
 
-			mov $1, (%edi, %eax, 4)
+			movl $1, (%edi, %eax, 4)
 
 		incl x
 		jmp for_x
@@ -163,9 +197,69 @@ for_y:
 	jmp for_y
 
 schimba_buffer:
-	# TODO: mainBuffer = !mainBuffer
+	movl mainBuffer, %eax
+	not %eax
+	movl %eax, mainBuffer
 
-	ret
+# daca (mainBuffer) print (buffer1) else print (buffer2)
+afisari:
+
+movl mainBuffer, %ecx
+cmp $0, %ecx
+je afis_buf2
+jmp afis_buf1
+
+afis_buf2:
+lea BUF2, %edi
+
+afis_buf1:
+lea BUF1, %edi
+
+movl $1, y
+afisare_matrice:
+	movl y, %ecx
+	cmp m, %ecx
+	jge exit
+
+	movl $1, x
+	afisare_matrice_x:
+		movl x, %ecx
+		cmp n, %ecx
+		jge continua_afisare
+
+		movl y, %eax
+		movl $20, %ebx
+		mull %ebx
+
+		addl x, %eax
+		movl (%edi, %eax, 4), %eax
+
+		cmp $0, %eax
+		je afisat_0
+		jmp afisat_1
+
+		afisat_0:
+			movl $afisat0, %ecx
+		afisat_1:
+			movl $afisat1, %ecx
+
+		mov $4, %eax
+		mov $1, %ebx
+		mov $3, %edx
+		int $0x80
+
+		incl x
+		jmp afisare_matrice_x
+	continua_afisare:
+
+	mov $4, %eax
+	mov $1, %ebx
+	mov $nl, %ecx
+	mov $1, %edx
+	int $0x80
+
+	incl y
+	jmp afisare_matrice
 
 exit:
 mov $1, %eax

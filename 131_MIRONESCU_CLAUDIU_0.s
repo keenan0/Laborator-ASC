@@ -1,7 +1,7 @@
 .data
-m: .long 0
-n: .long 0
-p: .long 0
+m: .long 5
+n: .long 10
+p: .long 15
 k: .long 0
 
 x: .long 0
@@ -11,8 +11,8 @@ mainBuffer: .long 1
 
 suma: .long 0
 
-BUF1: .space 400
-BUF2: .space 400
+BUF1: .space 1600
+BUF2: .space 1600
 
 formatString3: .asciz "%ld %ld %ld"
 formatString2: .asciz "%ld %ld"
@@ -28,48 +28,57 @@ nl: .ascii "\n"
 
 main:
 
-# SET_ZERO - seteaza pseudo matricea buf1 cu zero-uri
+# seteaza pseudo matricea buf1 cu zero-uri
+# inainte nu mergea inputul daca cmp X, %ecx avea X > $200 dar s a fixat bug ul de la sine??
+# VERIFICAT
+
+# CEL MAI MARE BUG BUF1 TREBUIA SA FIE DE 1600 de BYTES, NU DE 400!!!!
+# DIN CAUZA ASTA PROGRAMUL ACCESA MEMORIA GRESITA LA CITIRE
+
 set_zero1:
 	lea BUF1, %edi
-	movl $0, %ecx
+	xor %ecx, %ecx
 
 	for_zero:
 		cmp $400, %ecx
-		je input
+		jge input
 
 		movl $0, (%edi, %ecx, 4)
 
 		incl %ecx
 		jmp for_zero
 
-# INPUT - citeste numarul de linii, coloane si celule vii
+# nu stiu daca e necesar, dar merge cu ea
+xor %edi, %edi
+
+# citeste numarul de linii, coloane si celule vii
+# VERIFICAT
+
 input:
-	pushl $p
-	pushl $n
-	pushl $m
+pushl $p
+pushl $n
+pushl $m
 
-	pushl $formatString3
+pushl $formatString3
 
-	call scanf
+call scanf
 
-	popl %ebx
-	popl %ebx
-	popl %ebx
-	popl %ebx
-
+add $16, %esp
 movl p, %ecx
 
-jmp afisari
-for_cells:
-# practic forul urmator:
+# MERGE DACA DECOMENTEZI - jmp afisari
 
+# VERIFICAT
+lea BUF1, %edi
+for_cells:
 # for (int i = p; i >= 0; --i)
 #	scanf("%ld %ld", &y, &x)
 #	buf[y][x] = 1
 
 
 	cmp $0, %ecx
-	je input_iteratii
+	#je input_iteratii #je afisari pt ca sa mearga
+	je afisari
 
 	pushl %ecx
 	pushl $x
@@ -83,10 +92,12 @@ for_cells:
 	popl %ebx
 	popl %ecx
 
+	# MERG?
+	incl x
+	incl y
+
 	#adauga celula in buffer1
 	add_buffer:
-		lea BUF1, %edi
-
 		# BUF1 este o matrice de 20 x 20
 		# BUF1[y][x] <=> y * 20 * 4 + x * 4
 
@@ -167,7 +178,7 @@ for_y:
 			add x, %eax
 
 		if:
-			cmp $1, mainBuffer
+			cmpl $1, mainBuffer
 			je update_buffer2
 
 			jmp update_buffer1
@@ -176,13 +187,12 @@ for_y:
 			pushl $BUF2
 			pushl x
 			pushl y
-			test:
+
 			call get_cell_state
 
-			popl %ebx
-			popl %ebx
-			popl %ebx
+			add $12, %esp
 
+			# IN LOC DE 1 TERBUIE SUMA VECINILOR RETURNATA DE GET CELL STATE
 			movl $1, (%edi, %eax, 4)
 		update_buffer2:
 			lea BUF1, %edi
@@ -201,9 +211,13 @@ schimba_buffer:
 	not %eax
 	movl %eax, mainBuffer
 
-# daca (mainBuffer) print (buffer1) else print (buffer2)
-afisari:
+# CE BUGURI AVEM? -> NICIUNUL !!!!
+# ETICHETA FUNCTIONEAZA
 
+# VERIFICAT
+# daca (mainBuffer) print (buffer1) else print (buffer2)
+
+afisari:
 movl mainBuffer, %ecx
 cmp $0, %ecx
 je afis_buf2
@@ -219,13 +233,13 @@ movl $1, y
 afisare_matrice:
 	movl y, %ecx
 	cmp m, %ecx
-	jge exit
+	jg exit
 
 	movl $1, x
 	afisare_matrice_x:
 		movl x, %ecx
 		cmp n, %ecx
-		jge continua_afisare
+		jg continua_afisare
 
 		movl y, %eax
 		movl $20, %ebx
@@ -240,9 +254,11 @@ afisare_matrice:
 
 		afisat_0:
 			movl $afisat0, %ecx
+			jmp afis
 		afisat_1:
 			movl $afisat1, %ecx
 
+		afis:
 		mov $4, %eax
 		mov $1, %ebx
 		mov $3, %edx

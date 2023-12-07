@@ -77,8 +77,7 @@ for_cells:
 
 
 	cmp $0, %ecx
-	#je input_iteratii #je afisari pt ca sa mearga
-	je afisari
+	je input_iteratii
 
 	pushl %ecx
 	pushl $x
@@ -92,6 +91,7 @@ for_cells:
 	popl %ebx
 	popl %ecx
 
+	debug3:
 	# MERG?
 	incl x
 	incl y
@@ -117,10 +117,10 @@ input_iteratii:
 
 	call scanf
 
-	popl %ebx
-	popl %ebx
-jmp emulate
+	add $8, %esp
+	jmp emulate
 
+# VERIFCAT ASA SI ASA
 get_cell_state:
 	pushl %ebp
 	mov %esp, %ebp
@@ -129,24 +129,102 @@ get_cell_state:
 	pushl %eax
 	pushl %ecx
 
-	#  8(%ebp) = y
-	# 12(%ebp) = x
-	# 16(%ebp) = &BUFF
+	#  8(%ebp) = &suma
+	# 12(%ebp) = y
+	# 16(%ebp) = x
+	# 20(%ebp) = buff
 
-	lea 16(%ebp), %edi
+	#lea 20(%ebp), %edi
 
-	movl $0, suma
-	movl 8(%ebp), %eax
+	# eax = y-1
+	mov 12(%ebp), %eax
 	decl %eax
 
-	movl $20, %ebx
-	mull %ebx
+	# ebx = x - 1
+	mov 16(%ebp), %ebx
+	decl %ebx
 
-	movl 12(%ebp), %ebx
-	addl %ebx, %eax
+	# calculam adresa in matrice
+	mov $20, %ecx
+	mull %ecx
 
-	movl (%edi, %eax, 4), %ebx
-	addl %ebx, suma
+	add %ebx, %eax
+
+
+	# suma = 0
+	xor %ecx, %ecx
+	NW:
+	addl (%edi, %eax, 4), %ecx
+
+	N:
+	# x = x
+	incl %eax
+	addl (%edi, %eax, 4), %ecx
+
+	NE:
+	# x = x + 1
+	incl %eax
+	addl (%edi, %eax, 4), %ecx
+
+	E:
+	# y = y, x = x + 1
+	addl $20, %eax
+	add (%edi, %eax, 4), %ecx
+
+	W:
+	# y = y, x = x - 1
+	decl %eax
+	decl %eax
+	add (%edi, %eax, 4), %ecx
+
+	SW:
+	# y = y + 1, x = x - 1
+	addl $20, %eax
+	add (%edi, %eax, 4), %ecx
+
+	S:
+	#y = y + 1, x = x
+	incl %eax
+	add (%edi, %eax, 4), %ecx
+
+	SE:
+	#y = y + 1, x = x + 1
+	incl %eax
+	add (%edi, %eax, 4), %ecx
+
+	mov 8(%ebp), %ebx
+	mov %ecx, 0(%ebx)
+
+	# PANA AICI SE CALCULEAZA SUMA VECINILOR
+	debug:
+	movl %eax, %ebx
+	xor %eax, %eax
+
+	cmp $3, %ecx
+	je vecini3
+	jmp cmp2
+
+	vecini3:
+	incl %eax
+	jmp return_cell_state
+
+	cmp2:
+	cmp $2, %ecx
+	je vecini2
+	jmp return_cell_state
+
+	vecini2:
+	subl $21, %ebx
+	cmpl $0, (%edi, %ebx, 4)
+	je return_cell_state
+
+	mov $1, %eax
+
+	# IN EAX VA FI MEMORATA VIITOAREA STARE A UNEI CELULE
+
+	return_cell_state:
+	movl 8(%ebp), %ebx
+	movl %eax, 0(%ebx)
 
 	popl %ecx
 	popl %eax
@@ -157,8 +235,8 @@ get_cell_state:
 
 # EMULATE - functia care rezolva cate o iteratie
 emulate:
-movl $1, y
 
+movl $1, y
 for_y:
 	movl y, %ecx
 	cmp m, %ecx
@@ -184,21 +262,40 @@ for_y:
 			jmp update_buffer1
 
 		update_buffer1:
-			pushl $BUF2
+			lea BUF2, %edi
+			pushl $BUF1
 			pushl x
 			pushl y
+			pushl $suma
 
 			call get_cell_state
 
-			add $12, %esp
+			addl $16, %esp
 
 			# IN LOC DE 1 TERBUIE SUMA VECINILOR RETURNATA DE GET CELL STATE
-			movl $1, (%edi, %eax, 4)
+
+			lea BUF1, %edi
+			movl suma, %edx
+			movl %edx, (%edi, %eax, 4)
+
+			jmp inc_x
+
 		update_buffer2:
 			lea BUF1, %edi
+			pushl $BUF2
+			pushl x
+			pushl y
+			pushl $suma
 
-			movl $1, (%edi, %eax, 4)
+			call get_cell_state
 
+			addl $16, %esp
+
+			debug2:
+			lea BUF2, %edi
+			movl suma, %edx
+			movl %edx, (%edi, %eax, 4)
+		inc_x:
 		incl x
 		jmp for_x
 
@@ -208,7 +305,7 @@ for_y:
 
 schimba_buffer:
 	movl mainBuffer, %eax
-	not %eax
+	xor $1, %eax
 	movl %eax, mainBuffer
 
 # CE BUGURI AVEM? -> NICIUNUL !!!!
@@ -225,10 +322,12 @@ jmp afis_buf1
 
 afis_buf2:
 lea BUF2, %edi
+jmp matrice
 
 afis_buf1:
 lea BUF1, %edi
 
+matrice:
 movl $1, y
 afisare_matrice:
 	movl y, %ecx

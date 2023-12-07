@@ -118,6 +118,12 @@ input_iteratii:
 	call scanf
 
 	add $8, %esp
+for_k:
+	movl k, %ecx
+	cmp $0, %ecx
+	je afisari
+
+	decl k
 	jmp emulate
 
 # VERIFCAT ASA SI ASA
@@ -307,6 +313,7 @@ schimba_buffer:
 	movl mainBuffer, %eax
 	xor $1, %eax
 	movl %eax, mainBuffer
+	jmp for_k
 
 # CE BUGURI AVEM? -> NICIUNUL !!!!
 # ETICHETA FUNCTIONEAZA
